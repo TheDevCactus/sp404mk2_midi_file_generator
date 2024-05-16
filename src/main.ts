@@ -17,7 +17,7 @@ function initialize_ui() {
     <img src="bg_img.png" width="600" id="bg_img" />
     <div id="outer_container">
       <div id="inner_container">
-        <h2>SP404 Midi File Generator 0.0.1</h2>
+        <h2>SP404 Midi File Generator 0.1</h2>
         <button id="${BUILD_PATTERN_FILE_UPLOAD_ELEMENT_ID}">Upload Pattern Bin File</button>
         <button disabled id="${SAVE_AS_MIDI_FILE_BUTTON_ELEMENT_ID}">Save As Midi Files</button>
         <div class="text_container" id="instructions_container">

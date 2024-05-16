@@ -5,7 +5,7 @@ var I=Object.defineProperty;var S=(t,e,n)=>e in t?I(t,e,{enumerable:!0,configura
     <img src="bg_img.png" width="600" id="bg_img" />
     <div id="outer_container">
       <div id="inner_container">
-        <h2>SP404 Midi File Generator 0.0.1</h2>
+        <h2>SP404 Midi File Generator 0.1</h2>
         <button id="${v}">Upload Pattern Bin File</button>
         <button disabled id="${y}">Save As Midi Files</button>
         <div class="text_container" id="instructions_container">
