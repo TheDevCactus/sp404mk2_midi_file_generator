@@ -1,5 +1,10 @@
 import { NumToByteConverter, unsigned_number_would_overflow } from "./utils";
 
+const MIDI_HEADER_LENGTH = 6;
+const REQUIRED_MINIMUM_CHUNK_SIZE = 8;
+// This is the tpq that the SP404 mk2 uses
+export const TICKS_PER_QUARTER = 480;
+
 export enum MidiFileFormat {
   SingleTrack = 0,
   SimultaneousTracks = 1,
@@ -25,9 +30,6 @@ export function construct_midi_track_event(
     event: event
   }
 };
-
-// Amount of ticks per quarter note the SP404 mk2 uses
-export const TICKS_PER_QUARTER = 480;
 
 export const MidiEventConstructor = {
   note_off(channel: number, note: number, velocity: number): Uint8Array {
@@ -89,7 +91,6 @@ function is_valid_amount_of_tracks_for_file_format(
   return true;
 }
 
-const REQUIRED_MINIMUM_CHUNK_SIZE = 8;
 function make_midi_chunk(
   chunk_type: ChunkType,
   chunk_length: number
@@ -116,11 +117,9 @@ function make_midi_chunk(
   }
 
   out.set(chunk_length_bytes, 4);
-
   return out;
 }
 
-const MIDI_HEADER_LENGTH = 6;
 export function make_midi_header(
   file_format: MidiFileFormat,
   number_of_tracks: number,
@@ -166,43 +165,4 @@ export function make_midi_track_chunk(track_events: MidiTrackEvent[]): Uint8Arra
   });
 
   return out;
-}
-
-function createTestMidiFile(): string {
-  const fileFormat = MidiFileFormat.SingleTrack;
-  const numberOfTracks = 1;
-  const ticksPerQuarterNote = 480;
-
-  const header = make_midi_header(fileFormat, numberOfTracks, ticksPerQuarterNote);
-
-  const trackEvents: MidiTrackEvent[] = [
-    { v_time: 0, event: MidiEventConstructor.control_change(0, 7, 100) },  // Set volume
-    { v_time: 0, event: MidiEventConstructor.program_change(0, 10) },     // Change instrument
-    { v_time: 0, event: MidiEventConstructor.note_on(0, 60, 127) },       // Note on, Middle C
-    { v_time: 480, event: MidiEventConstructor.note_off(0, 60, 127) },    // Note off, Middle C
-    { v_time: 240, event: MidiEventConstructor.note_on(0, 64, 127) },     // Note on, E
-    { v_time: 480, event: MidiEventConstructor.note_off(0, 64, 127) },    // Note off, E
-    { v_time: 240, event: MidiEventConstructor.note_on(0, 67, 127) },     // Note on, G
-    { v_time: 480, event: MidiEventConstructor.note_off(0, 67, 127) },    // Note off, G
-    { v_time: 240, event: MidiEventConstructor.note_on(0, 72, 127) },     // Note on, C (one octave higher)
-    { v_time: 480, event: MidiEventConstructor.note_off(0, 72, 127) }     // Note off, C (one octave higher)
-  ];
-
-  const trackChunk = make_midi_track_chunk(trackEvents);
-
-  // Combine header and track chunks
-  const midiFile = new Uint8Array(header.length + trackChunk.length);
-  midiFile.set(header, 0);
-  midiFile.set(trackChunk, header.length);
-
-  // Convert to base64 for easy download in a browser environment
-  return btoa(String.fromCharCode(...midiFile));
-}
-
-export function download_test_midi_file() {
-  const midiData = createTestMidiFile();
-  const link = document.createElement('a');
-  link.href = `data:audio/midi;base64,${midiData}`;
-  link.download = 'test.mid';
-  link.click();
 }
