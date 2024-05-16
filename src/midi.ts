@@ -1,10 +1,34 @@
-import { NumToByteConverter, unsigned_number_would_overflow } from "./utils";
+import { little_endian_bytes_to_num, NumToByteConverter, unsigned_number_would_overflow } from "./utils";
 
 const MIDI_HEADER_LENGTH = 6;
 const REQUIRED_MINIMUM_CHUNK_SIZE = 8;
 // This is the tpq that the SP404 mk2 uses
 export const TICKS_PER_QUARTER = 480;
 
+const BYTES_IN_A_SINGLE_VALUE = 8;
+const META_DATA_SIZE = 16;
+const MIDI_MIDDLE_C = 67;
+const SP404_ROOT_C_PITCH = 0x8d;
+
+type PatternEvent = {
+  ticks_since_last_event: number;
+  pad_pressed: number;
+  bank: number;
+  pitch: number;
+  velocity: number;
+  hold_time: number;
+};
+
+type MidiFile = {
+  data: Uint8Array;
+  bank: number;
+  pad: number;
+};
+
+type BankID = number;
+type PadID = number;
+type PadDict<T> = Record<PadID, T>;
+type BankDict<T> = Record<BankID, T>;
 export enum MidiFileFormat {
   SingleTrack = 0,
   SimultaneousTracks = 1,
@@ -70,6 +94,125 @@ export const MidiEventConstructor = {
     return out;
   },
 };
+
+
+function sp404_pitch_to_midi_note(pitch: number): number {
+  const out = pitch - SP404_ROOT_C_PITCH + MIDI_MIDDLE_C;
+  return out;
+}
+
+function make_pattern_event_from_uint8array(array: Uint8Array): PatternEvent {
+  const event: PatternEvent = {
+    ticks_since_last_event: array[0],
+    pad_pressed: array[1],
+    bank: array[2],
+    pitch: array[3] ? sp404_pitch_to_midi_note(array[3]) : MIDI_MIDDLE_C,
+    velocity: array[4],
+    hold_time: little_endian_bytes_to_num(array.slice(-2)),
+  };
+  return event;
+}
+
+export function build_midi_files_from_midi_event_builder(midi_builder: MidiEventBuilder) {
+  let midi_files: MidiFile[] = [];
+
+  Object.entries(midi_builder.pattern_events).forEach(([bank_id, pads]) => {
+    Object.entries(pads).forEach(([pad_id, pad_events]) => {
+      const header = make_midi_header_chunk(
+        MidiFileFormat.SingleTrack,
+        1,
+        TICKS_PER_QUARTER
+      );
+      const track_chunk = make_midi_track_chunk(pad_events);
+      const midiFile = new Uint8Array(header.length + track_chunk.length);
+
+      midiFile.set(header, 0);
+      midiFile.set(track_chunk, header.length);
+      midi_files.push({
+        data: midiFile,
+        bank: Number(bank_id),
+        pad: Number(pad_id),
+      });
+    });
+  });
+
+  return midi_files;
+}
+
+export class MidiEventBuilder {
+  pattern_events: BankDict<PadDict<MidiTrackEvent[]>>;
+  constructor() {
+    this.pattern_events = {};
+  }
+  process_value(value: Uint8Array) {
+    const value_data = value.slice(0, -META_DATA_SIZE);
+    let current_global_tick_offset_from_start = 0;
+    for (let i = 0; i < value_data.length; i += BYTES_IN_A_SINGLE_VALUE) {
+      const value = value_data.slice(i, i + BYTES_IN_A_SINGLE_VALUE);
+      const pattern_event = make_pattern_event_from_uint8array(value);
+      current_global_tick_offset_from_start +=
+        pattern_event.ticks_since_last_event;
+      if (
+        !Object.prototype.hasOwnProperty.call(
+          this.pattern_events,
+          pattern_event.bank
+        )
+      ) {
+        this.pattern_events[pattern_event.bank] = {};
+      }
+      if (
+        !Object.prototype.hasOwnProperty.call(
+          this.pattern_events[pattern_event.bank],
+          pattern_event.pad_pressed
+        )
+      ) {
+        this.pattern_events[pattern_event.bank][pattern_event.pad_pressed] = [];
+      }
+      const last_event_from_bank_and_pad =
+        this.pattern_events[pattern_event.bank][pattern_event.pad_pressed][-1];
+
+      let time;
+      if (!last_event_from_bank_and_pad) {
+        time = current_global_tick_offset_from_start;
+      } else {
+        time =
+          current_global_tick_offset_from_start -
+          last_event_from_bank_and_pad.v_time;
+      }
+      console.log(pattern_event.pitch);
+      this.pattern_events[pattern_event.bank][pattern_event.pad_pressed].push(
+        construct_midi_track_event(
+          time,
+          MidiEventConstructor.note_on(
+            1,
+            pattern_event.pitch,
+            pattern_event.velocity
+          )
+        )
+      );
+      this.pattern_events[pattern_event.bank][pattern_event.pad_pressed].push(
+        construct_midi_track_event(
+          time + pattern_event.hold_time,
+          MidiEventConstructor.note_off(
+            1,
+            pattern_event.pitch,
+            pattern_event.velocity
+          )
+        )
+      );
+    }
+
+    const meta_data = value.slice(-META_DATA_SIZE);
+    if (
+      meta_data[14] * (TICKS_PER_QUARTER * 4) !==
+      current_global_tick_offset_from_start
+    ) {
+      throw new Error(
+        "Amount of ticks present in patterns does not match the incoming patterns bar length"
+      );
+    }
+  }
+}
 
 export function construct_midi_track_event(
   offset_since_last_event: number,

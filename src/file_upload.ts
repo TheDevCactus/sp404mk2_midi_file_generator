@@ -1,41 +1,8 @@
 import {
-  construct_midi_track_event,
-  make_midi_header_chunk,
-  make_midi_track_chunk,
-  MidiEventConstructor,
-  MidiFileFormat,
-  MidiTrackEvent,
-  TICKS_PER_QUARTER,
+  build_midi_files_from_midi_event_builder,
+  MidiEventBuilder,
 } from "./midi";
-import { little_endian_bytes_to_num } from "./utils";
-
-const BYTES_IN_A_SINGLE_VALUE = 8;
-const META_DATA_SIZE = 16;
-const MIDI_MIDDLE_C = 67;
-const SP404_ROOT_C_PITCH = 0x8d;
-
-type PatternEvent = {
-  ticks_since_last_event: number;
-  pad_pressed: number;
-  bank: number;
-  pitch: number;
-  velocity: number;
-  hold_time: number;
-};
-
-type MidiFile = {
-  data: Uint8Array;
-  bank: number;
-  pad: number;
-};
-
-type BankID = number;
-type PadID = number;
-type PadDict<T> = Record<PadID, T>;
-type BankDict<T> = Record<BankID, T>;
-
-let builder: MidiBuilder | null = null;
-let current_pattern_reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+import { global_state } from "./state";
 
 function get_reader_on_file_select(event: Event) {
   if (!event.target) {
@@ -50,7 +17,7 @@ function get_reader_on_file_select(event: Event) {
   }
 
   const stream = files[0].stream();
-  current_pattern_reader = stream.getReader();
+  global_state.current_pattern_reader = stream.getReader();
 }
 
 function handle_submit_button_enabled_disabled_state(
@@ -76,127 +43,10 @@ function handle_submit_button_enabled_disabled_state(
   submit_button.disabled = false;
 }
 
-function sp404_pitch_to_midi_note(pitch: number): number {
-  const out = pitch - SP404_ROOT_C_PITCH + MIDI_MIDDLE_C;
-  return out;
-}
-
-function make_pattern_event_from_uint8array(array: Uint8Array): PatternEvent {
-  const event: PatternEvent = {
-    ticks_since_last_event: array[0],
-    pad_pressed: array[1],
-    bank: array[2],
-    pitch: array[3] ? sp404_pitch_to_midi_note(array[3]) : MIDI_MIDDLE_C,
-    velocity: array[4],
-    hold_time: little_endian_bytes_to_num(array.slice(-2)),
-  };
-  return event;
-}
-
-class MidiBuilder {
-  pattern_events: BankDict<PadDict<MidiTrackEvent[]>>;
-  constructor() {
-    this.pattern_events = {};
-  }
-  process_value(value: Uint8Array) {
-    const value_data = value.slice(0, -META_DATA_SIZE);
-    let current_global_tick_offset_from_start = 0;
-    for (let i = 0; i < value_data.length; i += BYTES_IN_A_SINGLE_VALUE) {
-      const value = value_data.slice(i, i + BYTES_IN_A_SINGLE_VALUE);
-      const pattern_event = make_pattern_event_from_uint8array(value);
-      current_global_tick_offset_from_start +=
-        pattern_event.ticks_since_last_event;
-      if (
-        !Object.prototype.hasOwnProperty.call(
-          this.pattern_events,
-          pattern_event.bank
-        )
-      ) {
-        this.pattern_events[pattern_event.bank] = {};
-      }
-      if (
-        !Object.prototype.hasOwnProperty.call(
-          this.pattern_events[pattern_event.bank],
-          pattern_event.pad_pressed
-        )
-      ) {
-        this.pattern_events[pattern_event.bank][pattern_event.pad_pressed] = [];
-      }
-      const last_event_from_bank_and_pad =
-        this.pattern_events[pattern_event.bank][pattern_event.pad_pressed][-1];
-
-      let time;
-      if (!last_event_from_bank_and_pad) {
-        time = current_global_tick_offset_from_start;
-      } else {
-        time =
-          current_global_tick_offset_from_start -
-          last_event_from_bank_and_pad.v_time;
-      }
-      console.log(pattern_event.pitch);
-      this.pattern_events[pattern_event.bank][pattern_event.pad_pressed].push(
-        construct_midi_track_event(
-          time,
-          MidiEventConstructor.note_on(
-            1,
-            pattern_event.pitch,
-            pattern_event.velocity
-          )
-        )
-      );
-      this.pattern_events[pattern_event.bank][pattern_event.pad_pressed].push(
-        construct_midi_track_event(
-          time + pattern_event.hold_time,
-          MidiEventConstructor.note_off(
-            1,
-            pattern_event.pitch,
-            pattern_event.velocity
-          )
-        )
-      );
-    }
-
-    const meta_data = value.slice(-META_DATA_SIZE);
-    if (
-      meta_data[14] * (TICKS_PER_QUARTER * 4) !==
-      current_global_tick_offset_from_start
-    ) {
-      throw new Error(
-        "Amount of ticks present in patterns does not match the incoming patterns bar length"
-      );
-    }
-  }
-  build(): MidiFile[] {
-    let midi_files: MidiFile[] = [];
-
-    Object.entries(this.pattern_events).forEach(([bank_id, pads]) => {
-      Object.entries(pads).forEach(([pad_id, pad_events]) => {
-        const header = make_midi_header_chunk(
-          MidiFileFormat.SingleTrack,
-          1,
-          TICKS_PER_QUARTER
-        );
-        const track_chunk = make_midi_track_chunk(pad_events);
-        const midiFile = new Uint8Array(header.length + track_chunk.length);
-
-        midiFile.set(header, 0);
-        midiFile.set(track_chunk, header.length);
-        midi_files.push({
-          data: midiFile,
-          bank: Number(bank_id),
-          pad: Number(pad_id),
-        });
-      });
-    });
-
-    return midi_files;
-  }
-}
-
 async function handle_bin_file_ingress(
   reader: ReadableStreamDefaultReader<Uint8Array>
 ) {
-  builder = new MidiBuilder();
+  global_state.builder = new MidiEventBuilder();
 
   let complete = false;
   while (!complete) {
@@ -210,18 +60,18 @@ async function handle_bin_file_ingress(
         "No value present while simultaneously not done with reading"
       );
     }
-    builder.process_value(value);
+    global_state.builder.process_value(value);
   }
 }
 
 async function handle_midi_file_download() {
-  if (!builder) {
+  if (!global_state.builder) {
     throw new Error(
       "Attempted to download midi files that are not built yet. make sure to build midi files before attempting to call this function"
     );
   }
 
-  const files = builder.build();
+  const files = build_midi_files_from_midi_event_builder(global_state.builder);
   files.forEach((file) => {
     if (Number(file.bank) === 0 && Number(file.pad) === 128) {
       return;
@@ -251,13 +101,13 @@ export function register_ui_handlers_and_listeners(
   });
 
   submit_button.addEventListener("mousedown", async () => {
-    if (!current_pattern_reader) {
+    if (!global_state.current_pattern_reader) {
       throw new Error(`
         No current reader set, please make sure current_pattern_reader is set to a valid reader,
         you should really make sure that button is disabled if we somehow got here
       `);
     }
-    await handle_bin_file_ingress(current_pattern_reader);
+    await handle_bin_file_ingress(global_state.current_pattern_reader);
     handle_midi_file_download();
   });
 
