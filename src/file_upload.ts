@@ -225,6 +225,9 @@ async function handle_midi_file_download() {
 
   const files = builder.build();
   files.forEach((file) => {
+    if (Number(file.bank) === 0 && Number(file.pad) === 128) {
+      return;
+    }
     const link = document.createElement("a");
     const base_64_encoded_stringified_data = btoa(
       String.fromCharCode(...file.data)
@@ -235,34 +238,18 @@ async function handle_midi_file_download() {
   });
 }
 
-function render_midi_preview(container: HTMLDivElement) {
-  console.log(container);
-  container.replaceChildren();
-  if (!builder) {
-    throw new Error("Attempted to render preview utilizing builder before builder is initialized");
-  }
-  Object.entries(builder.pattern_events).forEach(([bank_id, pad_events]) => {
-    Object.entries(pad_events).forEach(([pad_id, events]) => {
-      events.forEach((event) => {
-        if (Number(bank_id) === 0 && Number(pad_id) === 128) {
-          return;
-        }
-        console.log(bank_id, pad_id, event);
-      });
-    });
-  });
-}
-
 export function register_ui_handlers_and_listeners(
-  file_input: HTMLInputElement,
+  file_input: HTMLButtonElement,
   submit_button: HTMLButtonElement,
-  save_output_patterns_button: HTMLButtonElement,
-  preview_container: HTMLDivElement
 ) {
-  console.log(preview_container);
-  file_input.addEventListener("change", get_reader_on_file_select);
-  file_input.addEventListener("change", (event) => {
-    handle_submit_button_enabled_disabled_state(event, submit_button);
+  file_input.addEventListener("mousedown", () => {
+    const el = document.createElement('input');
+    el.type = "file";
+    el.addEventListener("change", get_reader_on_file_select);
+    el.addEventListener("change", (event) => {
+      handle_submit_button_enabled_disabled_state(event, submit_button);
+    });
+    el.click();
   });
 
   submit_button.addEventListener("mousedown", async () => {
@@ -273,14 +260,7 @@ export function register_ui_handlers_and_listeners(
       `);
     }
     await handle_bin_file_ingress(current_pattern_reader);
-    render_midi_preview(preview_container);
-    save_output_patterns_button.disabled = false;
+    handle_midi_file_download();
   });
 
-  save_output_patterns_button.addEventListener("mousedown", async () => {
-    handle_midi_file_download();
-    save_output_patterns_button.disabled = true;
-    submit_button.disabled = true;
-    file_input.value = "";
-  });
 }
