@@ -53,7 +53,8 @@ function handle_submit_button_enabled_disabled_state(
 
 const BYTES_IN_A_SINGLE_VALUE = 8;
 const META_DATA_SIZE = 16;
-const DEFAULT_PITCH_IF_NOT_PROVIDED = 67;
+const MIDI_MIDDLE_C = 67;
+const SP404_ROOT_C_PITCH = 0x8d;
 
 type PatternEvent = {
   ticks_since_last_event: number;
@@ -64,13 +65,17 @@ type PatternEvent = {
   hold_time: number;
 };
 
+function sp404_pitch_to_midi_note(pitch: number): number {
+  const out = pitch - SP404_ROOT_C_PITCH + MIDI_MIDDLE_C;
+  return out;
+}
+
 function make_pattern_event_from_uint8array(array: Uint8Array): PatternEvent {
-  console.log(array);
   const event: PatternEvent = {
     ticks_since_last_event: array[0],
     pad_pressed: array[1],
     bank: array[2],
-    pitch: array[3] || DEFAULT_PITCH_IF_NOT_PROVIDED,
+    pitch: array[3] ? sp404_pitch_to_midi_note(array[3]) : MIDI_MIDDLE_C,
     velocity: array[4],
     hold_time: little_endian_bytes_to_num(array.slice(-2)),
   };
@@ -188,52 +193,94 @@ type MidiFile = {
   pad: number;
 };
 
-function build_midi_file_from_reader(
+let builder: MidiBuilder | null;
+async function handle_bin_file_ingress(
   reader: ReadableStreamDefaultReader<Uint8Array>
 ) {
   console.log("Reading file...");
-  const builder = new MidiBuilder();
+  builder = new MidiBuilder();
 
-  reader
-    .read()
-    .then(async function read({ done, value }): Promise<void> {
-      if (done) {
-        return;
-      }
-      builder.process_value(value);
-      return reader.read().then(read);
-    }).then(() => {
-      const files = builder.build();
-      files.forEach((file) => {
-        const link = document.createElement('a');
-        const base_64_encoded_stringified_data = btoa(String.fromCharCode(...file.data));
-        link.href = `data:audio/midi;base64,${base_64_encoded_stringified_data}`;
-        link.download = `${file.bank}-${file.pad}.mid`;
-        link.click();
-      });
-    });
+  let complete = false;
+  while (!complete) {
+    let { done, value } = await reader.read();
+    if (done) {
+      complete = true;
+      continue;
+    }
+    if (value === undefined) {
+      throw new Error(
+        "No value present while simultaneously not done with reading"
+      );
+    }
+    builder.process_value(value);
+  }
 }
 
-export function setup_file_upload_ui(
-  file_input: HTMLInputElement,
-  submit_button: HTMLButtonElement
-) {
-  file_input.addEventListener("change", get_reader_on_file_select, false);
-  file_input.addEventListener(
-    "change",
-    (event) => {
-      handle_submit_button_enabled_disabled_state(event, submit_button);
-    },
-    false
-  );
+async function handle_midi_file_download() {
+  if (!builder) {
+    throw new Error(
+      "Attempted to download midi files that are not built yet. make sure to build midi files before attempting to call this function"
+    );
+  }
 
-  submit_button.addEventListener("mousedown", () => {
+  const files = builder.build();
+  files.forEach((file) => {
+    const link = document.createElement("a");
+    const base_64_encoded_stringified_data = btoa(
+      String.fromCharCode(...file.data)
+    );
+    link.href = `data:audio/midi;base64,${base_64_encoded_stringified_data}`;
+    link.download = `${file.bank}-${file.pad}.mid`;
+    link.click();
+  });
+}
+
+function render_midi_preview(container: HTMLDivElement) {
+  console.log(container);
+  container.replaceChildren();
+  if (!builder) {
+    throw new Error("Attempted to render preview utilizing builder before builder is initialized");
+  }
+  Object.entries(builder.pattern_events).forEach(([bank_id, pad_events]) => {
+    Object.entries(pad_events).forEach(([pad_id, events]) => {
+      events.forEach((event) => {
+        if (Number(bank_id) === 0 && Number(pad_id) === 128) {
+          return;
+        }
+        console.log(bank_id, pad_id, event);
+      });
+    });
+  });
+}
+
+export function register_ui_handlers_and_listeners(
+  file_input: HTMLInputElement,
+  submit_button: HTMLButtonElement,
+  save_output_patterns_button: HTMLButtonElement,
+  preview_container: HTMLDivElement
+) {
+  console.log(preview_container);
+  file_input.addEventListener("change", get_reader_on_file_select);
+  file_input.addEventListener("change", (event) => {
+    handle_submit_button_enabled_disabled_state(event, submit_button);
+  });
+
+  submit_button.addEventListener("mousedown", async () => {
     if (!current_pattern_reader) {
       throw new Error(`
         No current reader set, please make sure current_pattern_reader is set to a valid reader,
         you should really make sure that button is disabled if we somehow got here
       `);
     }
-    build_midi_file_from_reader(current_pattern_reader);
+    await handle_bin_file_ingress(current_pattern_reader);
+    render_midi_preview(preview_container);
+    save_output_patterns_button.disabled = false;
+  });
+
+  save_output_patterns_button.addEventListener("mousedown", async () => {
+    handle_midi_file_download();
+    save_output_patterns_button.disabled = true;
+    submit_button.disabled = true;
+    file_input.value = "";
   });
 }
