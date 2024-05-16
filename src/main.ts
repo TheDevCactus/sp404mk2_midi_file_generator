@@ -26,7 +26,7 @@ function initialize_ui() {
             1: Click the "Upload Pattern Bin File" and select your pattern bin you wish to generate midi files for.
             <br/>
             <br/>
-            2: Click the "Build Midi Files" button.
+            2: Click the "Save As Midi Files" button.
             <br/>
             <br/>
             3: Midi files names will be in the following format
