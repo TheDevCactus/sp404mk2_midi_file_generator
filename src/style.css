@@ -1,0 +1,13 @@
+body {
+  background-color: #333;
+  color: #eee;
+}
+
+* {
+  gap: 10px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+}
