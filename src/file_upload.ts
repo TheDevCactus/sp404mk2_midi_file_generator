@@ -1,16 +1,41 @@
 import {
   construct_midi_track_event,
-  make_midi_header,
+  make_midi_header_chunk,
   make_midi_track_chunk,
   MidiEventConstructor,
   MidiFileFormat,
   MidiTrackEvent,
   TICKS_PER_QUARTER,
-} from "./midi_constructor";
+} from "./midi";
 import { little_endian_bytes_to_num } from "./utils";
 
-let current_pattern_reader: ReadableStreamDefaultReader<Uint8Array> | null =
-  null;
+const BYTES_IN_A_SINGLE_VALUE = 8;
+const META_DATA_SIZE = 16;
+const MIDI_MIDDLE_C = 67;
+const SP404_ROOT_C_PITCH = 0x8d;
+
+type PatternEvent = {
+  ticks_since_last_event: number;
+  pad_pressed: number;
+  bank: number;
+  pitch: number;
+  velocity: number;
+  hold_time: number;
+};
+
+type MidiFile = {
+  data: Uint8Array;
+  bank: number;
+  pad: number;
+};
+
+type BankID = number;
+type PadID = number;
+type PadDict<T> = Record<PadID, T>;
+type BankDict<T> = Record<BankID, T>;
+
+let builder: MidiBuilder | null = null;
+let current_pattern_reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
 function get_reader_on_file_select(event: Event) {
   if (!event.target) {
@@ -51,20 +76,6 @@ function handle_submit_button_enabled_disabled_state(
   submit_button.disabled = false;
 }
 
-const BYTES_IN_A_SINGLE_VALUE = 8;
-const META_DATA_SIZE = 16;
-const MIDI_MIDDLE_C = 67;
-const SP404_ROOT_C_PITCH = 0x8d;
-
-type PatternEvent = {
-  ticks_since_last_event: number;
-  pad_pressed: number;
-  bank: number;
-  pitch: number;
-  velocity: number;
-  hold_time: number;
-};
-
 function sp404_pitch_to_midi_note(pitch: number): number {
   const out = pitch - SP404_ROOT_C_PITCH + MIDI_MIDDLE_C;
   return out;
@@ -81,11 +92,6 @@ function make_pattern_event_from_uint8array(array: Uint8Array): PatternEvent {
   };
   return event;
 }
-
-type BankID = number;
-type PadID = number;
-type PadDict<T> = Record<PadID, T>;
-type BankDict<T> = Record<BankID, T>;
 
 class MidiBuilder {
   pattern_events: BankDict<PadDict<MidiTrackEvent[]>>;
@@ -165,7 +171,7 @@ class MidiBuilder {
 
     Object.entries(this.pattern_events).forEach(([bank_id, pads]) => {
       Object.entries(pads).forEach(([pad_id, pad_events]) => {
-        const header = make_midi_header(
+        const header = make_midi_header_chunk(
           MidiFileFormat.SingleTrack,
           1,
           TICKS_PER_QUARTER
@@ -187,17 +193,9 @@ class MidiBuilder {
   }
 }
 
-type MidiFile = {
-  data: Uint8Array;
-  bank: number;
-  pad: number;
-};
-
-let builder: MidiBuilder | null;
 async function handle_bin_file_ingress(
   reader: ReadableStreamDefaultReader<Uint8Array>
 ) {
-  console.log("Reading file...");
   builder = new MidiBuilder();
 
   let complete = false;

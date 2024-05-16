@@ -21,16 +21,6 @@ export type MidiTrackEvent = {
   event: Uint8Array;
 };
 
-export function construct_midi_track_event(
-  offset_since_last_event: number,
-  event: Uint8Array
-) {
-  return {
-    v_time: offset_since_last_event,
-    event: event
-  }
-};
-
 export const MidiEventConstructor = {
   note_off(channel: number, note: number, velocity: number): Uint8Array {
     const out = new Uint8Array(3);
@@ -81,6 +71,24 @@ export const MidiEventConstructor = {
   },
 };
 
+export function construct_midi_track_event(
+  offset_since_last_event: number,
+  event: Uint8Array
+): MidiTrackEvent {
+  const out: MidiTrackEvent = {
+    v_time: offset_since_last_event,
+    event: event
+  }
+  return out;
+};
+
+function get_total_length_of_track_events(track_events: MidiTrackEvent[]): number {
+  const total_length = track_events.reduce((length, event) => {
+    return length + event.event.length + NumToByteConverter.variable_length(event.v_time).length;
+  }, 0);
+  return total_length;
+}
+
 function is_valid_amount_of_tracks_for_file_format(
   file_format: MidiFileFormat,
   number_of_tracks: number
@@ -120,7 +128,7 @@ function make_midi_chunk(
   return out;
 }
 
-export function make_midi_header(
+export function make_midi_header_chunk(
   file_format: MidiFileFormat,
   number_of_tracks: number,
   ticks_per_quarter_note: number
@@ -144,13 +152,6 @@ export function make_midi_header(
   return out;
 }
 
-function get_total_length_of_track_events(track_events: MidiTrackEvent[]): number {
-  const total_length = track_events.reduce((length, event) => {
-    return length + event.event.length + NumToByteConverter.variable_length(event.v_time).length;
-  }, 0);
-  return total_length;
-}
-
 export function make_midi_track_chunk(track_events: MidiTrackEvent[]): Uint8Array {
   const total_length = get_total_length_of_track_events(track_events);
   const out = make_midi_chunk(ChunkType.Track, total_length);
@@ -166,3 +167,4 @@ export function make_midi_track_chunk(track_events: MidiTrackEvent[]): Uint8Arra
 
   return out;
 }
+
