@@ -87,6 +87,10 @@ hr {
   background-color: #555;
 }
 
+#pad_config_file_upload {
+  background-color: #555;
+}
+
 #build_midi_files {
   background-color: #333;
 }

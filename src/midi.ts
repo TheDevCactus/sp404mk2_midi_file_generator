@@ -102,6 +102,7 @@ function sp404_pitch_to_midi_note(pitch: number): number {
 }
 
 function make_pattern_event_from_uint8array(array: Uint8Array): PatternEvent {
+  console.log(array, array[1]);
   const event: PatternEvent = {
     ticks_since_last_event: array[0],
     pad_pressed: array[1],
@@ -143,6 +144,8 @@ export class MidiEventBuilder {
   pattern_events: BankDict<PadDict<MidiTrackEvent[]>>;
   constructor() {
     this.pattern_events = {};
+
+    this.process_value = this.process_value.bind(this);
   }
   process_value(value: Uint8Array) {
     const value_data = value.slice(0, -META_DATA_SIZE);

@@ -1,7 +1,8 @@
 import "./style.css";
-import { register_ui_handlers_and_listeners } from "./file_upload.ts";
+import { register_ui_handlers_and_listeners } from "./ui_management.ts";
 
-const BUILD_PATTERN_FILE_UPLOAD_ELEMENT_ID = "pattern_file_upload";
+const UPLOAD_PATTERN_BIN_FILE_ELEMENT_ID = "pattern_file_upload";
+const UPLOAD_PAD_CONFIG_FILE_ELEMENT_ID = "pad_config_file_upload";
 const SAVE_AS_MIDI_FILE_BUTTON_ELEMENT_ID = "build_midi_files";
 
 function get_el_by_id_or_error(id: string) {
@@ -18,7 +19,8 @@ function initialize_ui() {
     <div id="outer_container">
       <div id="inner_container">
         <h2>SP404 Midi File Generator 0.1</h2>
-        <button id="${BUILD_PATTERN_FILE_UPLOAD_ELEMENT_ID}">Upload Pattern Bin File</button>
+        <button id="${UPLOAD_PATTERN_BIN_FILE_ELEMENT_ID}">Upload Pattern Bin File</button>
+        <button id="${UPLOAD_PAD_CONFIG_FILE_ELEMENT_ID}">Upload Pad Config File - Optional</button>
         <button disabled id="${SAVE_AS_MIDI_FILE_BUTTON_ELEMENT_ID}">Save As Midi Files</button>
         <div class="text_container" id="instructions_container">
           <h4>Usage</h4>
@@ -29,13 +31,17 @@ function initialize_ui() {
             2: Click the "Save As Midi Files" button.
             <br/>
             <br/>
-            3: Midi files names will be in the following format
+            3: Midi file names
             <br/>
             <br/>
-            "{BANK_ID}_{PAD_ID}.mid"
+            &nbsp;&nbsp;a: Pad Config Uploaded 
+            <br/>
+            &nbsp;&nbsp;"{BANK_NAME}_{SAMPLE_NAME}.mid"
             <br/>
             <br/>
-            I know this is whack, Coming soon i'll allow for also uploading the .SMP files for your exported project which will allow for better naming of the exports.
+            &nbsp;&nbsp;b: Pad Config Not Uploaded 
+            <br/>
+            &nbsp;&nbsp;"{BANK_NAME}_{PAD_ID}.mid"
           </p>
         </div>
         <hr />
@@ -55,7 +61,8 @@ function initialize_ui() {
   `;
 
   register_ui_handlers_and_listeners(
-    get_el_by_id_or_error(BUILD_PATTERN_FILE_UPLOAD_ELEMENT_ID) as HTMLButtonElement,
+    get_el_by_id_or_error(UPLOAD_PATTERN_BIN_FILE_ELEMENT_ID) as HTMLButtonElement,
+    get_el_by_id_or_error(UPLOAD_PAD_CONFIG_FILE_ELEMENT_ID) as HTMLButtonElement,
     get_el_by_id_or_error(SAVE_AS_MIDI_FILE_BUTTON_ELEMENT_ID) as HTMLButtonElement
   );
 }

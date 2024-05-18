@@ -1,4 +1,36 @@
 
+export async function process_reader_with_callback<T>(
+  reader: ReadableStreamDefaultReader<T>,
+  callback: (value: T) => void
+) {
+  let complete = false;
+  while (!complete) {
+    let { done, value } = await reader.read();
+    if (done) {
+      complete = true;
+      continue;
+    }
+    if (value === undefined) {
+      throw new Error(
+        "No value present while simultaneously not done with reading"
+      );
+    }
+    callback(value);
+  }
+}
+
+
+export function download_string_as_file(
+  contents: string,
+  file_type: string,
+  file_name: string
+) {
+  const link = document.createElement("a");
+  link.href = `${file_type},${contents}`;
+  link.download = file_name;
+  link.click();
+}
+
 export function unsigned_number_would_overflow(number: number, bits: number): boolean {
   if (number > Math.pow(2, bits) - 1) {
     return true;
