@@ -1,20 +1,14 @@
 import "./style.css";
 import { register_ui_handlers_and_listeners } from "./ui_management.ts";
+import { get_el_by_id_or_error } from "./utils.ts";
 
 const UPLOAD_PATTERN_BIN_FILE_ELEMENT_ID = "pattern_file_upload";
 const UPLOAD_PAD_CONFIG_FILE_ELEMENT_ID = "pad_config_file_upload";
 const SAVE_AS_MIDI_FILE_BUTTON_ELEMENT_ID = "build_midi_files";
 
-function get_el_by_id_or_error(id: string) {
-  const el = document.getElementById(id);
-  if (!el) {
-    throw new Error("Element not found, make sure ID's match and that the element is in the DOM");
-  }
-  return el;
-}
-
 function initialize_ui() {
-  document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
+  const body = get_el_by_id_or_error("app");
+  body.innerHTML = `
     <img src="bg_img.png" width="600" id="bg_img" />
     <div id="outer_container">
       <div id="inner_container">
@@ -63,7 +57,7 @@ function initialize_ui() {
     </div>
     <footer>
       <a href="https://buymeacoffee.com/morgan_brown">Throw me a dollar</a>
-      <a href="https://thedevcactus.github.io/SamplerBlog/">$250 Sampler project</a>
+      <a href="https://thedevcactus.github.io/SamplerBlog/">Cheap Sampler/Groove box project</a>
       <a href="https://github.com/TheDevCactus/sp404mk2_midi_file_generator">My Github (sourcecode for this site)</a>
     </footer>
   `;

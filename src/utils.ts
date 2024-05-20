@@ -1,4 +1,12 @@
 
+export function get_el_by_id_or_error(id: string) {
+  const el = document.getElementById(id);
+  if (!el) {
+    throw new Error("Element not found, make sure ID's match and that the element is in the DOM");
+  }
+  return el;
+}
+
 export async function process_reader_with_callback<T>(
   reader: ReadableStreamDefaultReader<T>,
   callback: (value: T) => void
