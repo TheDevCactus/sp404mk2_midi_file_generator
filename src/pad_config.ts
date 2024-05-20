@@ -12,10 +12,10 @@ const PROJECT_NAME_SIZE = 24;
 const BANKS_ON_MACHINE = 10;
 
 const BYTES_IN_BANK = 384;
-const FIRST_BANK_OFFSET = 0x00006C38;
+const FIRST_BANK_OFFSET = 0x00006C20;
 const SAMPLE_NAME_SIZE = 24;
 
-const bank_name_lookup = {
+export const bank_name_lookup = {
   0: 'A',
   1: 'B',
   2: 'C',
@@ -40,7 +40,7 @@ export class PadConfigBuilder {
   process_value(value: Uint8Array) {
     const project_name = value.slice(PROJECT_NAME_OFFSET, PROJECT_NAME_OFFSET + PROJECT_NAME_SIZE);
     console.log(project_name);
-    for (let i = 0; i < BANKS_ON_MACHINE; ++i) {
+    for (let i = 0; i < BANKS_ON_MACHINE; i++) {
       const first_byte_offset = FIRST_BANK_OFFSET + BYTES_IN_BANK * i;
       const bank_name = bank_name_lookup[i as keyof typeof bank_name_lookup];
       if (!Object.prototype.hasOwnProperty.call(this.bank_info, bank_name)) {

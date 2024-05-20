@@ -2,9 +2,13 @@ import {
   build_midi_files_from_midi_event_builder,
   MidiEventBuilder,
 } from "./midi";
-import { PadConfigBuilder } from "./pad_config";
+import { bank_name_lookup, PadConfigBuilder } from "./pad_config";
 import { global_state } from "./state";
 import { download_string_as_file, process_reader_with_callback } from "./utils";
+
+const PAD_OFFSET = 47;
+const PADS_PER_BANK = 16;
+const TIME_SPACING_PAD_ID = 128;
 
 function get_reader_from_file_select_event(event: Event) {
   if (!event.target) {
@@ -56,15 +60,32 @@ function handle_midi_file_download() {
     global_state.midi_event_builder
   );
   files.forEach((file) => {
-    if (Number(file.bank) === 0 && Number(file.pad) === 128) {
+    if (Number(file.pad) === TIME_SPACING_PAD_ID) {
       return;
     }
+
     const base_64_contents = btoa(String.fromCharCode(...file.data));
-    console.log('!!!', global_state.pad_config_builder?.bank_info['A'][file.pad - 46])
+
+    const is_second_layer_bank = file.bank_layer === 1;
+    const bank_id_offset = is_second_layer_bank ? 5 : 0;
+    const actual_bank_id = Math.floor((file.pad - PAD_OFFSET) / PADS_PER_BANK) + bank_id_offset;
+    const actual_pad = (file.pad - PAD_OFFSET) % PADS_PER_BANK;
+    const bank_name = bank_name_lookup[actual_bank_id as keyof typeof bank_name_lookup];
+
+    if (!global_state.pad_config_builder || Object.keys(global_state.pad_config_builder.bank_info).length === 0) {
+      download_string_as_file(
+        base_64_contents,
+        "data:audio/midi;base64",
+        `${bank_name}-${actual_pad + 1}`
+      );
+      return;
+    }
+
+    const sample_name = global_state.pad_config_builder?.bank_info[bank_name][actual_pad];
     download_string_as_file(
       base_64_contents,
       "data:audio/midi;base64",
-      `${file.bank}-${file.pad}`
+      `${bank_name}-${sample_name}`
     );
   });
 }
@@ -86,7 +107,7 @@ export function register_ui_handlers_and_listeners(
   });
 
   pad_config_input.addEventListener("mousedown", () => {
-    console.log('sleet')
+    console.log("sleet");
     const el = document.createElement("input");
     el.type = "file";
     el.addEventListener("change", (e: Event) => {
@@ -107,15 +128,19 @@ export function register_ui_handlers_and_listeners(
 
     let work_load: Promise<void>[] = [];
     if (global_state.current_pad_config_reader) {
-      work_load.push(process_reader_with_callback<Uint8Array>(
-        global_state.current_pad_config_reader,
-        global_state.pad_config_builder?.process_value
-      ))
+      work_load.push(
+        process_reader_with_callback<Uint8Array>(
+          global_state.current_pad_config_reader,
+          global_state.pad_config_builder?.process_value
+        )
+      );
     }
-    work_load.push(process_reader_with_callback<Uint8Array>(
-      global_state.current_pattern_reader,
-      global_state.midi_event_builder?.process_value
-    ));
+    work_load.push(
+      process_reader_with_callback<Uint8Array>(
+        global_state.current_pattern_reader,
+        global_state.midi_event_builder?.process_value
+      )
+    );
     await Promise.all(work_load);
 
     handle_midi_file_download();

@@ -25,30 +25,38 @@ function initialize_ui() {
         <div class="text_container" id="instructions_container">
           <h4>Usage</h4>
           <p>
-            1: Click the "Upload Pattern Bin File" and select your pattern bin you wish to generate midi files for.
+            1: Click the "Upload Pattern Bin File" button and select your pattern bin you wish to generate midi files for.
             <br/>
             <br/>
-            2: Click the "Save As Midi Files" button.
+            2: Optionally, Click the "Upload Pad Config File" button and select your projects PADCONF.BIN file. This lets us build better file names for you including the sample name.
             <br/>
             <br/>
-            3: Midi file names
+            3: Click the "Save As Midi Files" button.
             <br/>
             <br/>
-            &nbsp;&nbsp;a: Pad Config Uploaded 
+            Midi files will be downloaded individually.
+            If a pad config file was uploaded, the file names will be as follows
             <br/>
-            &nbsp;&nbsp;"{BANK_NAME}_{SAMPLE_NAME}.mid"
+            <br/>
+            <b>"{BANK_NAME}_{SAMPLE_NAME}.mid"</b>
             <br/>
             <br/>
-            &nbsp;&nbsp;b: Pad Config Not Uploaded 
+            Otherwise, file names will be as follows. 
             <br/>
-            &nbsp;&nbsp;"{BANK_NAME}_{PAD_ID}.mid"
+            <br/>
+            <b>"{BANK_NAME}_{PAD_ID}.mid"</b>
           </p>
         </div>
         <hr />
         <div class="text_container" id="blurb">
           <p>
-            Rolands application does export to midi but it exports all pads to one midi file which annoyed me while trying to get projects into a daw.
+            Half way through developing this, I found out that Rolands SP404mk2 application does export to midi.
+            But it exports all pads to one midi file which annoyed me while trying to get projects into a daw.
             So this project exports each pad as an individual midi pattern.
+          </p>
+          <p>
+            This is very much a work in progress and has not been battle tested, If you find any bugs, or would like a
+            feature added, please submit an issue in <a href="https://github.com/TheDevCactus/sp404mk2_midi_file_generator/issues/new/choose">GitHub</a>.
           </p>
         </div>
       </div>

@@ -21,7 +21,7 @@ type PatternEvent = {
 
 type MidiFile = {
   data: Uint8Array;
-  bank: number;
+  bank_layer: number;
   pad: number;
 };
 
@@ -102,7 +102,6 @@ function sp404_pitch_to_midi_note(pitch: number): number {
 }
 
 function make_pattern_event_from_uint8array(array: Uint8Array): PatternEvent {
-  console.log(array, array[1]);
   const event: PatternEvent = {
     ticks_since_last_event: array[0],
     pad_pressed: array[1],
@@ -131,7 +130,7 @@ export function build_midi_files_from_midi_event_builder(midi_builder: MidiEvent
       midiFile.set(track_chunk, header.length);
       midi_files.push({
         data: midiFile,
-        bank: Number(bank_id),
+        bank_layer: Number(bank_id),
         pad: Number(pad_id),
       });
     });
@@ -182,7 +181,6 @@ export class MidiEventBuilder {
           current_global_tick_offset_from_start -
           last_event_from_bank_and_pad.v_time;
       }
-      console.log(pattern_event.pitch);
       this.pattern_events[pattern_event.bank][pattern_event.pad_pressed].push(
         construct_midi_track_event(
           time,
