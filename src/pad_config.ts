@@ -7,8 +7,6 @@ type PadCollection = Record<PadID, PadInfo>;
 type BankID = string;
 type BankInfo = Record<BankID, PadCollection>;
 
-const PROJECT_NAME_OFFSET = 128;
-const PROJECT_NAME_SIZE = 24;
 const BANKS_ON_MACHINE = 10;
 
 const BYTES_IN_BANK = 384;
@@ -38,8 +36,6 @@ export class PadConfigBuilder {
     this.process_value = this.process_value.bind(this);
   }
   process_value(value: Uint8Array) {
-    const project_name = value.slice(PROJECT_NAME_OFFSET, PROJECT_NAME_OFFSET + PROJECT_NAME_SIZE);
-    console.log(project_name);
     for (let i = 0; i < BANKS_ON_MACHINE; i++) {
       const first_byte_offset = FIRST_BANK_OFFSET + BYTES_IN_BANK * i;
       const bank_name = bank_name_lookup[i as keyof typeof bank_name_lookup];
@@ -64,8 +60,5 @@ export class PadConfigBuilder {
         this.bank_info[bank_name][pad_index] = stringified_sample_name
       }
     }
-
-    console.log(this.bank_info);
-
   }
 }

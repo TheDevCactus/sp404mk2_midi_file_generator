@@ -107,7 +107,6 @@ export function register_ui_handlers_and_listeners(
   });
 
   pad_config_input.addEventListener("mousedown", () => {
-    console.log("sleet");
     const el = document.createElement("input");
     el.type = "file";
     el.addEventListener("change", (e: Event) => {

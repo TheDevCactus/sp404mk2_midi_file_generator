@@ -27,7 +27,6 @@ export async function process_reader_with_callback<T>(
   }
 }
 
-
 export function download_string_as_file(
   contents: string,
   file_type: string,
